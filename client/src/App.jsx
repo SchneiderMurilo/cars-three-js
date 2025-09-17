@@ -8,6 +8,7 @@ import PlayerName from "./components/PlayerName";
 import PlayerNameLabel from "./components/PlayerNameLabel";
 import OtherPlayer from "./components/OtherPlayer";
 import { useWebSocket } from "./hooks/useWebSocket";
+import Logo from "./components/Logo.js";
 
 function App() {
     const carRef = useRef();
@@ -46,6 +47,7 @@ function App() {
 
     return (
         <div style={{ width: "100vw", height: "100vh", backgroundColor: "white" }}>
+            <Logo/>
             <PlayerName onNameSet={setPlayerName} />
             <Leaderboard
                 players={players}
