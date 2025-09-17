@@ -70,7 +70,6 @@ function App() {
                 frameloop="always"
                 gl={{ preserveDrawingBuffer: true }}
                 onCreated={({ gl }) => {
-                    // Força o canvas a continuar renderizando mesmo quando não está em foco
                     gl.setAnimationLoop = (callback) => {
                         const animate = () => {
                             if (callback) callback();
@@ -80,7 +79,6 @@ function App() {
                     };
                 }}
             >
-                {/* Iluminação */}
                 <ambientLight intensity={0.6} />
                 <directionalLight
                     position={[20, 20, 10]}
@@ -94,7 +92,6 @@ function App() {
                     shadow-camera-bottom={-50}
                 />
 
-                {/* Componentes do jogo */}
                 <Track />
                 <Car
                     ref={carRef}
@@ -110,7 +107,6 @@ function App() {
                 />
                 <Camera target={carRef} />
 
-                {/* Outros jogadores */}
                 {Array.from(players.values())
                     .filter(player => player.id !== currentPlayerId)
                     .map((player) => (

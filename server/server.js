@@ -6,17 +6,12 @@ const wss = new WebSocket.Server({ port: 8080 });
 const players = new Map();
 const rooms = new Map();
 
-console.log('Servidor WebSocket rodando na porta 8080');
 
-// Verifica inatividade dos jogadores a cada 10 segundos
 setInterval(() => {
     const now = Date.now();
     players.forEach((player, playerId) => {
-        // Se não recebeu heartbeat há mais de 15 segundos ou está inativo há mais de 10 segundos
         if (now - player.lastHeartbeat > 15000 || (player.inactive && now - player.inactiveTime > 10000)) {
-            console.log(`Kickando jogador inativo: ${player.name}`);
 
-            // Envia mensagem de kick
             if (player.ws.readyState === WebSocket.OPEN) {
                 player.ws.send(JSON.stringify({ type: 'KICKED' }));
                 player.ws.close();
@@ -29,7 +24,6 @@ setInterval(() => {
 
 wss.on('connection', (ws) => {
     const playerId = uuidv4();
-    console.log(`Jogador ${playerId} conectado`);
 
     ws.on('message', (message) => {
         try {
@@ -59,17 +53,14 @@ wss.on('connection', (ws) => {
                     break;
             }
         } catch (error) {
-            console.error('Erro ao processar mensagem:', error);
         }
     });
 
     ws.on('close', () => {
-        console.log(`Jogador ${playerId} desconectado`);
         handlePlayerDisconnect(playerId);
     });
 
     ws.on('error', (error) => {
-        console.error('Erro WebSocket:', error);
     });
 });
 
@@ -80,7 +71,6 @@ function handlePlayerJoin(ws, playerId, data) {
         rooms.set(roomId, new Set());
     }
 
-    // Usa quedas salvas se fornecidas, senão inicia com 0
     const savedFalls = typeof data.savedFalls === 'number' ? data.savedFalls : 0;
 
     const player = {
@@ -92,7 +82,7 @@ function handlePlayerJoin(ws, playerId, data) {
         rotation: 0,
         carModel: String(data.carModel),
         falling: false,
-        falls: savedFalls, // Usa quedas salvas do localStorage
+        falls: savedFalls,
         lastHeartbeat: Date.now(),
         inactive: false,
         inactiveTime: null
@@ -101,15 +91,12 @@ function handlePlayerJoin(ws, playerId, data) {
     players.set(playerId, player);
     rooms.get(roomId).add(playerId);
 
-    console.log(`Jogador ${player.name} entrou na sala ${roomId} com ${savedFalls} quedas salvas`);
 
-    // Envia confirmação de join com ID do jogador
     ws.send(JSON.stringify({
         type: 'JOIN_SUCCESS',
         playerId: playerId
     }));
 
-    // Envia lista de jogadores existentes para o novo jogador
     const existingPlayers = Array.from(rooms.get(roomId))
         .filter(id => id !== playerId)
         .map(id => {
@@ -130,7 +117,6 @@ function handlePlayerJoin(ws, playerId, data) {
         players: existingPlayers
     }));
 
-    // Notifica outros jogadores sobre o novo jogador (inclui quedas salvas)
     broadcastToRoom(roomId, {
         type: 'PLAYER_JOINED',
         player: {
@@ -140,11 +126,10 @@ function handlePlayerJoin(ws, playerId, data) {
             rotation: player.rotation,
             carModel: String(player.carModel),
             falling: player.falling,
-            falls: player.falls // Inclui quedas salvas na notificação
+            falls: player.falls
         }
     }, playerId);
 
-    console.log(`Jogador ${player.name} entrou na sala ${roomId}`);
 }
 
 function handlePositionUpdate(playerId, data) {
@@ -153,15 +138,14 @@ function handlePositionUpdate(playerId, data) {
 
     player.position = data.position;
     player.rotation = data.rotation;
-    player.carModel = String(data.carModel); // Garante que seja string
+    player.carModel = String(data.carModel);
 
-    // Broadcast da posição para outros jogadores na mesma sala (sem throttling no servidor)
     broadcastToRoom(player.roomId, {
         type: 'PLAYER_UPDATE',
         playerId: playerId,
         position: data.position,
         rotation: data.rotation,
-        carModel: String(data.carModel) // Garante que seja string
+        carModel: String(data.carModel)
     }, playerId);
 }
 
@@ -170,7 +154,7 @@ function handlePlayerFell(playerId, data) {
     if (!player) return;
 
     player.falling = true;
-    player.falls += 1; // Incrementa contador de quedas
+    player.falls += 1;
 
     broadcastToRoom(player.roomId, {
         type: 'PLAYER_FELL',
@@ -185,7 +169,7 @@ function handlePlayerRespawn(playerId, data) {
 
     player.position = data.position;
     player.rotation = data.rotation;
-    player.carModel = String(data.carModel); // Garante que seja string
+    player.carModel = String(data.carModel);
     player.falling = false;
 
     broadcastToRoom(player.roomId, {
@@ -193,7 +177,7 @@ function handlePlayerRespawn(playerId, data) {
         playerId: playerId,
         position: data.position,
         rotation: data.rotation,
-        carModel: String(data.carModel) // Garante que seja string
+        carModel: String(data.carModel)
     }, playerId);
 }
 
@@ -201,7 +185,6 @@ function handlePlayerDisconnect(playerId) {
     const player = players.get(playerId);
     if (!player) return;
 
-    // Remove da sala
     if (rooms.has(player.roomId)) {
         rooms.get(player.roomId).delete(playerId);
         if (rooms.get(player.roomId).size === 0) {
@@ -209,7 +192,6 @@ function handlePlayerDisconnect(playerId) {
         }
     }
 
-    // Notifica outros jogadores
     broadcastToRoom(player.roomId, {
         type: 'PLAYER_LEFT',
         playerId: playerId
@@ -224,21 +206,16 @@ function handleHeartbeat(playerId, data) {
 
     player.lastHeartbeat = Date.now();
 
-    // Se o jogador perdeu o foco da janela
     if (!data.focused && !player.inactive) {
         player.inactive = true;
         player.inactiveTime = Date.now();
-        console.log(`Jogador ${player.name} ficou inativo`);
     }
 
-    // Se o jogador recuperou o foco
     if (data.focused && player.inactive) {
         player.inactive = false;
         player.inactiveTime = null;
-        console.log(`Jogador ${player.name} voltou a ficar ativo`);
     }
 
-    // Responde ao heartbeat
     player.ws.send(JSON.stringify({ type: 'PONG' }));
 }
 
@@ -248,7 +225,6 @@ function handlePlayerInactive(playerId) {
 
     player.inactive = true;
     player.inactiveTime = Date.now();
-    console.log(`Jogador ${player.name} reportou inatividade`);
 }
 
 function broadcastToRoom(roomId, message, excludePlayerId = null) {

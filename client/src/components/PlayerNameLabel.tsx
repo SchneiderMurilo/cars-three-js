@@ -12,13 +12,11 @@ export default function PlayerNameLabel({ position, playerName, carRotation }: P
     // @ts-ignore
     return (
         <group position={[position[0], position[1] + 5, position[2]]} rotation={[0, carRotation + Math.PI, 0]}>
-            {/* Fundo retangular cinza */}
             <mesh>
                 <planeGeometry args={[playerName.length * 0.2 + 0.3, 0.5]} />
                 <meshBasicMaterial color="#666666" transparent opacity={0.5} />
             </mesh>
 
-            {/* Texto do nome */}
             <Text
                 position={[0, 0, 0.01]}
                 fontSize={0.3}

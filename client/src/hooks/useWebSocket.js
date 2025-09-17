@@ -9,7 +9,6 @@ export function useWebSocket(playerName) {
     const heartbeatInterval = useRef(null);
     const isWindowFocused = useRef(true);
 
-    // Função para salvar quedas no localStorage
     const saveFallsToStorage = (playerId, playerName, falls) => {
         const playerData = {
             name: playerName,
@@ -18,11 +17,9 @@ export function useWebSocket(playerName) {
         };
         localStorage.setItem(`player_${playerId}`, JSON.stringify(playerData));
 
-        // Também salva com o nome como chave para recuperar em futuras sessões
         localStorage.setItem(`playerStats_${playerName}`, JSON.stringify(playerData));
     };
 
-    // Função para carregar quedas do localStorage
     const loadFallsFromStorage = (playerName) => {
         try {
             const saved = localStorage.getItem(`playerStats_${playerName}`);
@@ -36,20 +33,15 @@ export function useWebSocket(playerName) {
         return 0;
     };
 
-    // Detecta quando a janela perde/ganha foco
     useEffect(() => {
         const handleFocus = () => {
             isWindowFocused.current = true;
-            console.log('Janela ganhou foco');
         };
 
         const handleBlur = () => {
             isWindowFocused.current = false;
-            console.log('Janela perdeu foco');
-            // Envia sinal de inatividade após 2 segundos sem foco
             setTimeout(() => {
                 if (!isWindowFocused.current && ws.current && ws.current.readyState === WebSocket.OPEN) {
-                    console.log('Enviando sinal de inatividade');
                     ws.current.send(JSON.stringify({ type: 'INACTIVE' }));
                 }
             }, 2000);
@@ -76,7 +68,6 @@ export function useWebSocket(playerName) {
 
         ws.current = new WebSocket('ws://localhost:8080');
 
-        // Heartbeat mais frequente para detectar desconexões
         heartbeatInterval.current = setInterval(() => {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
                 ws.current.send(JSON.stringify({
@@ -84,22 +75,19 @@ export function useWebSocket(playerName) {
                     focused: isWindowFocused.current
                 }));
             }
-        }, 5000); // A cada 5 segundos
+        }, 5000);
 
         ws.current.onopen = () => {
-            console.log('Conectado ao servidor');
             setConnected(true);
 
-            // Carrega quedas salvas do localStorage
             const savedFalls = loadFallsFromStorage(playerName);
-            console.log(`Quedas salvas para ${playerName}:`, savedFalls);
 
             ws.current.send(JSON.stringify({
                 type: 'JOIN',
                 playerName: playerName,
                 roomId: 'default',
                 carModel: Math.floor(Math.random() * 4) + 1,
-                savedFalls: savedFalls // Envia quedas salvas para o servidor
+                savedFalls: savedFalls
             }));
         };
 
@@ -108,13 +96,10 @@ export function useWebSocket(playerName) {
 
             switch (data.type) {
                 case 'JOIN_SUCCESS':
-                    console.log('Join success, playerId:', data.playerId);
                     setCurrentPlayerId(data.playerId);
 
-                    // Carrega quedas salvas para usar na inicialização
                     const savedFalls = loadFallsFromStorage(playerName);
 
-                    // Adiciona o próprio jogador imediatamente
                     setPlayers(prev => {
                         const newMap = new Map(prev);
                         newMap.set(data.playerId, {
@@ -125,39 +110,32 @@ export function useWebSocket(playerName) {
                             carModel: Math.floor(Math.random() * 4) + 1,
                             falling: false
                         });
-                        console.log('Adicionado próprio jogador ao mapa:', newMap);
                         return newMap;
                     });
 
-                    // Adiciona estatísticas para o próprio jogador com quedas salvas
                     setPlayerStats(prev => {
                         const newStats = new Map(prev);
                         newStats.set(data.playerId, {
                             name: playerName,
-                            falls: savedFalls // Usa quedas salvas do localStorage
+                            falls: savedFalls
                         });
-                        console.log('Adicionadas estatísticas do próprio jogador com quedas salvas:', newStats);
                         return newStats;
                     });
                     break;
 
                 case 'EXISTING_PLAYERS':
-                    console.log('Jogadores existentes recebidos:', data.players);
                     setPlayers(prev => {
-                        const newMap = new Map(prev); // Mantém o jogador atual
+                        const newMap = new Map(prev);
 
-                        // Adiciona jogadores existentes
                         data.players.forEach(player => {
                             newMap.set(player.id, player);
                         });
 
-                        console.log('Mapa final de jogadores:', newMap);
                         return newMap;
                     });
 
-                    // Atualiza estatísticas dos jogadores existentes
                     setPlayerStats(prev => {
-                        const newStats = new Map(prev); // Mantém as estatísticas do jogador atual
+                        const newStats = new Map(prev);
 
                         data.players.forEach(player => {
                             newStats.set(player.id, {
@@ -181,7 +159,7 @@ export function useWebSocket(playerName) {
                         const newStats = new Map(prev);
                         newStats.set(data.player.id, {
                             name: data.player.name,
-                            falls: data.player.falls || 0 // Usa quedas do servidor
+                            falls: data.player.falls || 0
                         });
                         return newStats;
                     });
@@ -223,7 +201,6 @@ export function useWebSocket(playerName) {
                                 falls: newFalls
                             });
 
-                            // Salva no localStorage se for o jogador atual
                             if (data.playerId === currentPlayerId) {
                                 saveFallsToStorage(data.playerId, playerStat.name, newFalls);
                             }
@@ -269,13 +246,11 @@ export function useWebSocket(playerName) {
                     break;
 
                 case 'PONG':
-                    // Resposta ao heartbeat
                     break;
             }
         };
 
         ws.current.onclose = () => {
-            console.log('Desconectado do servidor');
             setConnected(false);
         };
 
@@ -354,7 +329,6 @@ export function useWebSocket(playerName) {
                     };
                     newStats.set(currentPlayerId, updatedStat);
 
-                    // Salva automaticamente no localStorage quando incrementa
                     saveFallsToStorage(currentPlayerId, playerStat.name, newFalls);
                 }
                 return newStats;

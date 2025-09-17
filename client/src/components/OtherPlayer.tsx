@@ -29,16 +29,14 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
     const rotationVelocityRef = useRef(new THREE.Vector3(0, 0, 0));
     const smoothedPosition = useRef(new THREE.Vector3(...player.position));
 
-    // Extrai número do modelo
     const carNumber = typeof player.carModel === "string"
         ? player.carModel.match(/car(\d+)\.glb/)?.[1] || "1"
         : String(player.carModel);
     const carPath = `/models/car${carNumber}.glb`;
     const { scene } = useGLTF(carPath);
 
-    // Função para gerar posição de spawn aleatória
     const getRandomSpawnPosition = (): [number, number, number] => {
-        const randomX = (Math.random() - 0.5) * 120; // 120 de 200 para evitar bordas
+        const randomX = (Math.random() - 0.5) * 120;
         const randomZ = (Math.random() - 0.5) * 120;
         return [randomX, 0.5, randomZ];
     };
@@ -48,15 +46,12 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
         const oldPos = lastPosition.current;
         const distance = newPos.distanceTo(oldPos);
 
-        // Detecta se houve teleporte (respawn)
         if (distance > 50) {
-            // É um respawn, reseta estados de queda
             setLocalFalling(false);
             fallRotationRef.current = 0;
             fallVelocityRef.current = 0;
             rotationVelocityRef.current.set(0, 0, 0);
 
-            // Se não tem posição específica, usa spawn aleatório
             if (player.position[0] === 0 && player.position[2] === 0) {
                 const randomPos = getRandomSpawnPosition();
                 targetPosition.current.set(...randomPos);
@@ -74,12 +69,8 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
         targetRotation.current = player.rotation;
         lastPosition.current.copy(newPos);
 
-        // Sincroniza estado de queda com servidor, mas mantém lógica local
         if (!player.falling && localFalling) {
-            // Servidor diz que não está caindo, mas localmente detectamos que deveria
-            // Mantém a queda local até resetar
         } else if (player.falling && !localFalling) {
-            // Servidor confirma queda
             setLocalFalling(true);
         }
     }, [player.position, player.rotation, player.falling]);
@@ -88,7 +79,6 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
         if (!groupRef.current) return;
         const safeDelta = Math.min(delta, 1 / 30);
 
-        // Verifica se saiu da pista (detecção local)
         const trackSize = 200;
         const carLength = 3;
         const angle = targetRotation.current;
@@ -102,13 +92,10 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
             rotationVelocityRef.current.set(0, 0, 0);
         }
 
-        // Aplica física de queda (local ou do servidor)
         if (player.falling || localFalling) {
-            // Aplica gravidade
             fallVelocityRef.current += 9.8 * safeDelta;
             groupRef.current.position.y -= fallVelocityRef.current * safeDelta;
 
-            // Continua movimento horizontal durante a queda
             const horizontalMovement = new THREE.Vector3(
                 Math.sin(targetRotation.current) * 0.1,
                 0,
@@ -116,32 +103,25 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
             );
             groupRef.current.position.add(horizontalMovement);
 
-            // Rotação realista durante a queda
             rotationVelocityRef.current.x += 2 * safeDelta;
             groupRef.current.rotation.x -= rotationVelocityRef.current.x * safeDelta;
 
-            // Interpolação suave da rotação Y
             const currentY = groupRef.current.rotation.y;
             const targetY = targetRotation.current;
             groupRef.current.rotation.y = THREE.MathUtils.lerp(currentY, targetY, 0.8);
         } else {
-            // Movimento normal na pista com interpolação mais suave
-            const lerpFactor = isBeingPushed ? 0.8 : 0.15; // Movimento mais rápido quando empurrado
+            const lerpFactor = isBeingPushed ? 0.8 : 0.15;
 
-            // Interpola para posição alvo
             smoothedPosition.current.lerp(targetPosition.current, lerpFactor);
             groupRef.current.position.copy(smoothedPosition.current);
 
-            // Interpolação da rotação
             const currentY = groupRef.current.rotation.y;
             const targetY = targetRotation.current;
             groupRef.current.rotation.y = THREE.MathUtils.lerp(currentY, targetY, lerpFactor);
 
-            // Retorna rotação X para normal
             groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
         }
 
-        // Faz a tag do nome sempre olhar para a câmera
         if (nameRef.current) {
             nameRef.current.position.set(
                 groupRef.current.position.x,
@@ -162,7 +142,6 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
                 />
             </group>
 
-            {/* Label do jogador */}
             <group ref={nameRef}>
                 <mesh>
                     <planeGeometry args={[player.name.length * 0.5 + 0.5, 0.8]} />

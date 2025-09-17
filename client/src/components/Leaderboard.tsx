@@ -7,7 +7,6 @@ type LeaderboardProps = {
 };
 
 export default function Leaderboard({ players, currentPlayerId, playerStats }: LeaderboardProps) {
-    // Combina dados dos jogadores ativos com estatísticas
     const leaderboardData = Array.from(players.values())
         .map(player => ({
             id: player.id,
@@ -15,14 +14,14 @@ export default function Leaderboard({ players, currentPlayerId, playerStats }: L
             falls: playerStats.get(player.id)?.falls || 0,
             isCurrentPlayer: player.id === currentPlayerId
         }))
-        .sort((a, b) => a.falls - b.falls); // Ordena por menor número de quedas
+        .sort((a, b) => a.falls - b.falls);
 
     const getPositionColor = (index: number) => {
         switch (index) {
-            case 0: return "#FFD700"; // Ouro
-            case 1: return "#C0C0C0"; // Prata
-            case 2: return "#CD7F32"; // Bronze
-            default: return "#666666"; // Cinza
+            case 0: return "#FFD700";
+            case 1: return "#C0C0C0";
+            case 2: return "#CD7F32";
+            default: return "#666666";
         }
     };
 
@@ -40,14 +39,14 @@ export default function Leaderboard({ players, currentPlayerId, playerStats }: L
             position: "absolute",
             top: 20,
             left: 20,
-            backgroundColor: "rgba(255, 255, 255, 0.98)", // Mais opaco
+            backgroundColor: "rgba(255, 255, 255, 0.98)",
             padding: "15px",
             borderRadius: "10px",
             minWidth: "280px",
-            boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)", // Sombra mais forte
+            boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
             border: "2px solid #ddd",
-            zIndex: 1000, // Z-index alto para ficar sempre em primeiro plano
-            backdropFilter: "blur(5px)" // Desfoque de fundo para melhor legibilidade
+            zIndex: 1000,
+            backdropFilter: "blur(5px)"
         }}>
             <h3 style={{
                 margin: "0 0 15px 0",
@@ -86,7 +85,7 @@ export default function Leaderboard({ players, currentPlayerId, playerStats }: L
                             borderRadius: "8px",
                             border: player.isCurrentPlayer ? "2px solid #2196f3" : "1px solid #eee",
                             fontWeight: player.isCurrentPlayer ? "bold" : "normal",
-                            backdropFilter: "blur(3px)" // Desfoque suave para cada item
+                            backdropFilter: "blur(3px)"
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

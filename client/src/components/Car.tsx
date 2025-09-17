@@ -36,18 +36,15 @@ const Car = forwardRef<THREE.Group, CarProps>(({
     const initialPosition = useRef(new THREE.Vector3(...position));
     const [selectedCar, setSelectedCar] = useState(() => {
         const carNumber = Math.floor(Math.random() * 4) + 1;
-        console.log(`Carro selecionado: car${carNumber}.glb`);
         return `/models/car${carNumber}.glb`;
     });
 
-    // Carrega o modelo GLB randomizado
     const { scene } = useGLTF(selectedCar);
 
-    // Função para gerar posição de spawn aleatória
     const getRandomSpawnPosition = () => {
-        const randomX = (Math.random() - 0.5) * 120; // 120 de 200 para evitar bordas
+        const randomX = (Math.random() - 0.5) * 120;
         const randomZ = (Math.random() - 0.5) * 120;
-        const randomAngle = Math.random() * Math.PI * 2; // rotação aleatória
+        const randomAngle = Math.random() * Math.PI * 2;
         return { position: [randomX, initialPosition.current.y, randomZ] as [number, number, number], angle: randomAngle };
     };
 
@@ -68,18 +65,14 @@ const Car = forwardRef<THREE.Group, CarProps>(({
         };
     }, []);
 
-    // Função para detectar colisão entre dois carros
     const checkCollision = (pos1: THREE.Vector3, pos2: THREE.Vector3, minDistance = 5.5) => {
         return pos1.distanceTo(pos2) < minDistance;
     };
 
-    // Função para aplicar física de colisão melhorada
     const handleCollision = (myPos: THREE.Vector3, otherPos: THREE.Vector3, myVelocity: THREE.Vector3) => {
-        // Calcula direção de separação
         const separationDirection = new THREE.Vector3().subVectors(myPos, otherPos);
         const distance = separationDirection.length();
 
-        // Se a distância é muito pequena, força uma direção aleatória
         if (distance < 0.1) {
             separationDirection.set(
                 (Math.random() - 0.5) * 2,
@@ -90,19 +83,15 @@ const Car = forwardRef<THREE.Group, CarProps>(({
 
         separationDirection.normalize();
 
-        // Força de separação baseada na distância (quanto mais próximo, maior a força)
         const minDistance = 4.5;
         const separationForce = Math.max(0, (minDistance - distance) / minDistance) * 0.5;
 
-        // Aplica separação imediata na posição
         const immediateForce = separationDirection.clone().multiplyScalar(separationForce * 2);
         myPos.add(new THREE.Vector3(immediateForce.x, 0, immediateForce.z));
 
-        // Adiciona força na velocidade para movimento contínuo
         const velocityForce = separationDirection.clone().multiplyScalar(0.15);
         myVelocity.add(new THREE.Vector3(velocityForce.x, 0, velocityForce.z));
 
-        // Limita velocidade após colisão
         const maxVelocity = 0.5;
         if (myVelocity.length() > maxVelocity) {
             myVelocity.normalize().multiplyScalar(maxVelocity);
@@ -111,11 +100,10 @@ const Car = forwardRef<THREE.Group, CarProps>(({
         return separationDirection;
     };
 
-    // Função para verificar e resolver sobreposição
     const resolveOverlap = (current: THREE.Group) => {
         if (!otherPlayers || !currentPlayerId) return;
 
-        const maxIterations = 3; // Múltiplas iterações para resolver sobreposições complexas
+        const maxIterations = 3;
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             let hasOverlap = false;
@@ -129,12 +117,10 @@ const Car = forwardRef<THREE.Group, CarProps>(({
                     if (distance < minDistance) {
                         hasOverlap = true;
 
-                        // Calcula direção de separação
                         const direction = new THREE.Vector3()
                             .subVectors(current.position, otherPos)
                             .normalize();
 
-                        // Se não há direção clara, usa uma aleatória
                         if (direction.length() < 0.1) {
                             direction.set(
                                 (Math.random() - 0.5) * 2,
@@ -143,7 +129,6 @@ const Car = forwardRef<THREE.Group, CarProps>(({
                             ).normalize();
                         }
 
-                        // Move para fora da zona de colisão
                         const pushDistance = (minDistance - distance) * 0.6;
                         const pushVector = direction.multiplyScalar(pushDistance);
                         current.position.add(new THREE.Vector3(pushVector.x, 0, pushVector.z));
@@ -151,7 +136,6 @@ const Car = forwardRef<THREE.Group, CarProps>(({
                 }
             });
 
-            // Se não há mais sobreposições, para as iterações
             if (!hasOverlap) break;
         }
     };
@@ -160,14 +144,11 @@ const Car = forwardRef<THREE.Group, CarProps>(({
         const current = groupRef.current;
         if (!current) return;
 
-        // Garante delta mínimo para evitar pausa total
-        const safeDelta = Math.min(delta, 1/30); // Máximo de 30fps como fallback
+        const safeDelta = Math.min(delta, 1/30);
 
-        // Se está caindo, apenas aplica gravidade e rotação
         if (fallingRef.current) {
-            velocityRef.current.y -= 9.8 * safeDelta; // gravidade
+            velocityRef.current.y -= 9.8 * safeDelta;
 
-            // Continua movimento horizontal durante a queda
             const direction = new THREE.Vector3(
                 Math.sin(angleRef.current) * velocityRef.current.z,
                 0,
@@ -176,15 +157,12 @@ const Car = forwardRef<THREE.Group, CarProps>(({
             current.position.add(direction);
             current.position.add(new THREE.Vector3(0, velocityRef.current.y * safeDelta, 0));
 
-            // Rotação realista durante a queda (frente cai primeiro)
             rotationVelocityRef.current.x += 2 * safeDelta;
             current.rotation.x -= rotationVelocityRef.current.x * safeDelta;
 
             fallTimeRef.current += safeDelta;
 
-            // Respawn após 3 segundos
             if (fallTimeRef.current >= 3) {
-                // Usa função de spawn aleatório
                 const spawnData = getRandomSpawnPosition();
 
                 current.position.set(...spawnData.position);
@@ -195,13 +173,10 @@ const Car = forwardRef<THREE.Group, CarProps>(({
                 fallingRef.current = false;
                 fallTimeRef.current = 0;
 
-                // Muda o carro no respawn
                 const carNumber = Math.floor(Math.random() * 4) + 1;
                 const newCarPath = `/models/car${carNumber}.glb`;
-                console.log(`Novo carro selecionado: car${carNumber}.glb`);
                 setSelectedCar(newCarPath);
 
-                // Notifica servidor sobre respawn
                 if (onPlayerRespawn) {
                     onPlayerRespawn(
                         spawnData.position,
@@ -229,11 +204,9 @@ const Car = forwardRef<THREE.Group, CarProps>(({
         }
 
         if (keys["ArrowDown"] || keys["s"]) {
-            // Se está indo para frente, aplica freio gradual
-            if (velocity.z > 0.5) { // threshold mínimo para considerar "parado"
+            if (velocity.z > 0.5) {
                 velocity.z = Math.max(velocity.z - brakeForce, 0);
             }
-            // Só permite ré quando realmente parou
             else if (velocity.z <= 0.3 && velocity.z >= -0.2) {
                 velocity.z = Math.max(velocity.z - reverseAcceleration, -maxReverseSpeed);
             }
@@ -249,16 +222,13 @@ const Car = forwardRef<THREE.Group, CarProps>(({
 
         velocity.multiplyScalar(friction);
 
-        // Primeiro resolve qualquer sobreposição existente
         resolveOverlap(current);
 
-        // Verifica colisão com outros jogadores ANTES de aplicar movimento
         if (otherPlayers && currentPlayerId) {
             Array.from(otherPlayers.values()).forEach(otherPlayer => {
                 if (otherPlayer.id !== currentPlayerId && !otherPlayer.falling) {
                     const otherPos = new THREE.Vector3(...otherPlayer.position);
 
-                    // Verifica colisão com tolerância maior
                     if (checkCollision(current.position, otherPos)) {
                         handleCollision(current.position, otherPos, velocity);
                     }
@@ -266,23 +236,18 @@ const Car = forwardRef<THREE.Group, CarProps>(({
             });
         }
 
-        // Calcula movimento com a velocidade (que pode ter sido alterada pela colisão)
         const movement = new THREE.Vector3(
             Math.sin(angle) * velocity.z,
             0,
             Math.cos(angle) * velocity.z
         );
 
-        // Aplica movimento
         current.position.add(movement);
         current.rotation.y = angle;
 
-        // Resolve novamente após movimento para garantir que não há sobreposição
-        // Verifica se a frente do carro saiu da plataforma (física mais realista)
         const trackSize = 200;
-        const carLength = 3; // comprimento aproximado do carro
+        const carLength = 3;
 
-        // Calcula posição da frente do carro
         const frontX = current.position.x + Math.sin(angle) * carLength;
         const frontZ = current.position.z + Math.cos(angle) * carLength;
 
@@ -292,33 +257,27 @@ const Car = forwardRef<THREE.Group, CarProps>(({
                 velocityRef.current.y = 0;
                 rotationVelocityRef.current.set(0, 0, 0);
 
-                // Notifica servidor que jogador caiu
                 if (onPlayerFell) {
                     onPlayerFell();
                 }
 
-                // Atualiza estatísticas locais do próprio jogador
                 if (onSelfFell) {
                     onSelfFell();
                 }
             }
         }
 
-        // Armazena velocidade para a câmera acessar
         current.userData.velocity = velocity.clone();
 
-        // Atualiza posição para o label do jogador
         if (onPositionChange) {
             onPositionChange([current.position.x, current.position.y, current.position.z], angle);
         }
 
-        // Atualiza próprio jogador no mapa local
         if (onUpdateSelf) {
             onUpdateSelf([current.position.x, current.position.y, current.position.z], angle, selectedCar);
         }
 
-        // Envia atualização via WebSocket com alta frequência
-        if (onSendUpdate && Math.random() < 0.8) { // 80% de chance por frame para máxima responsividade
+        if (onSendUpdate && Math.random() < 0.8) {
             onSendUpdate(
                 [current.position.x, current.position.y, current.position.z],
                 angle,
