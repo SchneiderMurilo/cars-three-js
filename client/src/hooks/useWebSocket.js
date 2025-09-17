@@ -66,7 +66,7 @@ export function useWebSocket(playerName) {
     useEffect(() => {
         if (!playerName) return;
 
-        ws.current = new WebSocket('ws://192.168.1.250:8888');
+        ws.current = new WebSocket('wss://ioficina.iopoint.com.br/ws/');
 
         heartbeatInterval.current = setInterval(() => {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
