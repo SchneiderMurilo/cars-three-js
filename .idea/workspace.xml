@@ -6,10 +6,12 @@
   <component name="ChangeListManager">
     <list default="true" id="f435603f-ca89-4ac2-ae6f-65560b142a6b" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/copilotDiffState.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/copilotDiffState.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/App.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/components/Camera.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/components/Camera.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/components/Car.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/components/Car.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/src/components/OtherPlayer.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/components/OtherPlayer.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/components/Leaderboard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/components/Leaderboard.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/components/Track.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/components/Track.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/hooks/useWebSocket.js" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/hooks/useWebSocket.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server/server.js" afterDir="false" />
     </list>

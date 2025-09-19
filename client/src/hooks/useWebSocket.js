@@ -6,37 +6,39 @@ export function useWebSocket(playerName) {
     const [connected, setConnected] = useState(false);
     const [currentPlayerId, setCurrentPlayerId] = useState(null);
     const [playerStats, setPlayerStats] = useState(new Map());
+    const [platformSize, setPlatformSize] = useState(200);
+    const [isWaitingForRound, setIsWaitingForRound] = useState(true);
+    const [waitingCountdown, setWaitingCountdown] = useState(0);
+    const [currentRound, setCurrentRound] = useState(0);
     const heartbeatInterval = useRef(null);
 
-    const saveFallsToStorage = (playerId, playerName, falls) => {
-        const playerData = {
-            name: playerName,
-            falls: falls,
-            lastPlayed: Date.now()
-        };
-        localStorage.setItem(`player_${playerId}`, JSON.stringify(playerData));
-
-        localStorage.setItem(`playerStats_${playerName}`, JSON.stringify(playerData));
-    };
-
-    const loadFallsFromStorage = (playerName) => {
+    const savePlayerRecord = (playerName, survivalTime) => {
         try {
-            const saved = localStorage.getItem(`playerStats_${playerName}`);
-            if (saved) {
-                const data = JSON.parse(saved);
-                return data.falls || 0;
+            const records = JSON.parse(localStorage.getItem('playerRecords') || '{}');
+            if (!records[playerName] || survivalTime > records[playerName]) {
+                records[playerName] = survivalTime;
+                localStorage.setItem('playerRecords', JSON.stringify(records));
             }
         } catch (error) {
-            console.error('Erro ao carregar quedas do localStorage:', error);
+            console.error('Erro ao salvar recorde:', error);
         }
-        return 0;
+    };
+
+    const getPlayerRecord = (playerName) => {
+        try {
+            const records = JSON.parse(localStorage.getItem('playerRecords') || '{}');
+            return records[playerName] || 0;
+        } catch (error) {
+            console.error('Erro ao carregar recorde:', error);
+            return 0;
+        }
     };
 
     useEffect(() => {
         if (!playerName) return;
 
-        // ws.current = new WebSocket('wss://ioficina.iopoint.com.br/ws/');
-        ws.current = new WebSocket('ws://localhost:8888/');
+        ws.current = new WebSocket('wss://ioficina.iopoint.com.br/ws/');
+        // ws.current = new WebSocket('ws://localhost:8888/');
 
         heartbeatInterval.current = setInterval(() => {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -49,14 +51,11 @@ export function useWebSocket(playerName) {
         ws.current.onopen = () => {
             setConnected(true);
 
-            const savedFalls = loadFallsFromStorage(playerName);
-
             ws.current.send(JSON.stringify({
                 type: 'JOIN',
                 playerName: playerName,
                 roomId: 'default',
-                carModel: Math.floor(Math.random() * 4) + 1,
-                savedFalls: savedFalls
+                carModel: Math.floor(Math.random() * 4) + 1
             }));
         };
 
@@ -66,8 +65,9 @@ export function useWebSocket(playerName) {
             switch (data.type) {
                 case 'JOIN_SUCCESS':
                     setCurrentPlayerId(data.playerId);
-
-                    const savedFalls = loadFallsFromStorage(playerName);
+                    setPlatformSize(data.platformSize);
+                    setIsWaitingForRound(data.isWaitingForRound);
+                    setCurrentRound(data.roundNumber);
 
                     setPlayers(prev => {
                         const newMap = new Map(prev);
@@ -77,7 +77,8 @@ export function useWebSocket(playerName) {
                             position: [0, 1, 0],
                             rotation: 0,
                             carModel: Math.floor(Math.random() * 4) + 1,
-                            falling: false
+                            falling: false,
+                            isWaitingForRound: data.isWaitingForRound
                         });
                         return newMap;
                     });
@@ -86,7 +87,9 @@ export function useWebSocket(playerName) {
                         const newStats = new Map(prev);
                         newStats.set(data.playerId, {
                             name: playerName,
-                            falls: savedFalls
+                            currentTime: 0,
+                            bestTime: getPlayerRecord(playerName),
+                            totalRounds: 0
                         });
                         return newStats;
                     });
@@ -95,26 +98,67 @@ export function useWebSocket(playerName) {
                 case 'EXISTING_PLAYERS':
                     setPlayers(prev => {
                         const newMap = new Map(prev);
-
                         data.players.forEach(player => {
                             newMap.set(player.id, player);
                         });
-
                         return newMap;
                     });
 
                     setPlayerStats(prev => {
                         const newStats = new Map(prev);
-
                         data.players.forEach(player => {
+                            const existingStat = newStats.get(player.id);
                             newStats.set(player.id, {
                                 name: player.name,
-                                falls: player.falls || 0
+                                currentTime: player.survivalTime || 0,
+                                bestTime: existingStat ? existingStat.bestTime : getPlayerRecord(player.name),
+                                totalRounds: existingStat ? existingStat.totalRounds : 0
                             });
                         });
-
                         return newStats;
                     });
+                    break;
+
+                case 'WAITING_NEW_ROUND':
+                    setIsWaitingForRound(true);
+                    setWaitingCountdown(data.countdown);
+                    setCurrentRound(data.roundNumber);
+                    break;
+
+                case 'NEW_ROUND_STARTED':
+                    setPlatformSize(data.platformSize);
+                    setCurrentRound(data.roundNumber);
+                    setIsWaitingForRound(false);
+                    setWaitingCountdown(0);
+
+                    setPlayers(prev => {
+                        const newMap = new Map();
+                        prev.forEach((player, id) => {
+                            newMap.set(id, {
+                                ...player,
+                                falling: false,
+                                position: [0, 1, 0],
+                                isWaitingForRound: false
+                            });
+                        });
+                        return newMap;
+                    });
+
+                    // Não limpar os stats, apenas resetar o tempo atual
+                    setPlayerStats(prev => {
+                        const newStats = new Map();
+                        prev.forEach((stat, id) => {
+                            newStats.set(id, {
+                                ...stat,
+                                currentTime: 0
+                            });
+                        });
+                        return newStats;
+                    });
+                    break;
+
+                case 'ROUND_ENDED':
+                    setIsWaitingForRound(true);
                     break;
 
                 case 'PLAYER_JOINED':
@@ -128,7 +172,85 @@ export function useWebSocket(playerName) {
                         const newStats = new Map(prev);
                         newStats.set(data.player.id, {
                             name: data.player.name,
-                            falls: data.player.falls || 0
+                            currentTime: 0,
+                            bestTime: getPlayerRecord(data.player.name),
+                            totalRounds: 0
+                        });
+                        return newStats;
+                    });
+                    break;
+
+                case 'PLAYER_FELL':
+                    setPlayers(prev => {
+                        const newMap = new Map(prev);
+                        const player = newMap.get(data.playerId);
+                        if (player) {
+                            newMap.set(data.playerId, {
+                                ...player,
+                                falling: true,
+                                isWaitingForRound: true
+                            });
+                        }
+                        return newMap;
+                    });
+
+                    setPlayerStats(prev => {
+                        const newStats = new Map(prev);
+                        const playerStat = newStats.get(data.playerId);
+                        if (playerStat) {
+                            const survivalTime = data.survivalTime || 0;
+                            const newTotalRounds = playerStat.totalRounds + 1;
+
+                            // Verificar se é um novo recorde
+                            const isNewRecord = survivalTime > playerStat.bestTime;
+                            const newBestTime = isNewRecord ? survivalTime : playerStat.bestTime;
+
+                            // Salvar recorde se necessário
+                            if (isNewRecord) {
+                                savePlayerRecord(playerStat.name, survivalTime);
+                            }
+
+                            newStats.set(data.playerId, {
+                                ...playerStat,
+                                currentTime: survivalTime,
+                                bestTime: newBestTime,
+                                totalRounds: newTotalRounds
+                            });
+                        }
+                        return newStats;
+                    });
+
+                    if (data.playerId === currentPlayerId) {
+                        setIsWaitingForRound(true);
+                    }
+                    break;
+
+                case 'PLATFORM_UPDATE':
+                    setPlatformSize(data.platformSize);
+                    setCurrentRound(data.roundNumber);
+                    break;
+
+                case 'GAME_RESTART':
+                    setPlatformSize(data.platformSize);
+                    setPlayers(prev => {
+                        const newMap = new Map();
+                        prev.forEach((player, id) => {
+                            newMap.set(id, {
+                                ...player,
+                                falling: false,
+                                position: [0, 1, 0]
+                            });
+                        });
+                        return newMap;
+                    });
+
+                    setPlayerStats(prev => {
+                        const newStats = new Map();
+                        prev.forEach((stat, id) => {
+                            newStats.set(id, {
+                                ...stat,
+                                survivalTime: 0
+                            });
                         });
                         return newStats;
                     });
@@ -147,34 +269,6 @@ export function useWebSocket(playerName) {
                             });
                         }
                         return newMap;
-                    });
-                    break;
-
-                case 'PLAYER_FELL':
-                    setPlayers(prev => {
-                        const newMap = new Map(prev);
-                        const player = newMap.get(data.playerId);
-                        if (player) {
-                            newMap.set(data.playerId, { ...player, falling: true });
-                        }
-                        return newMap;
-                    });
-
-                    setPlayerStats(prev => {
-                        const newStats = new Map(prev);
-                        const playerStat = newStats.get(data.playerId);
-                        if (playerStat) {
-                            const newFalls = playerStat.falls + 1;
-                            newStats.set(data.playerId, {
-                                ...playerStat,
-                                falls: newFalls
-                            });
-
-                            if (data.playerId === currentPlayerId) {
-                                saveFallsToStorage(data.playerId, playerStat.name, newFalls);
-                            }
-                        }
-                        return newStats;
                     });
                     break;
 
@@ -290,14 +384,93 @@ export function useWebSocket(playerName) {
                 const newStats = new Map(prev);
                 const playerStat = newStats.get(currentPlayerId);
                 if (playerStat) {
-                    const newFalls = playerStat.falls + 1;
-                    const updatedStat = {
-                        ...playerStat,
-                        falls: newFalls
-                    };
-                    newStats.set(currentPlayerId, updatedStat);
+                    // Remover a lógica de falls já que agora usamos survival time
+                    // Esta função pode ser mantida para compatibilidade mas não faz nada
+                }
+                return newStats;
+            });
+        }
+    };
 
-                    saveFallsToStorage(currentPlayerId, playerStat.name, newFalls);
+    // Modificar o useEffect para parar o tempo quando cair
+    useEffect(() => {
+        if (!isWaitingForRound && currentPlayerId) {
+            // Definir tempo de início quando a rodada começar
+            const startTime = Date.now();
+
+            setPlayerStats(prev => {
+                const newStats = new Map(prev);
+                const playerStat = newStats.get(currentPlayerId);
+                if (playerStat) {
+                    newStats.set(currentPlayerId, {
+                        ...playerStat,
+                        startTime: startTime,
+                        currentTime: 0,
+                        isFalling: false
+                    });
+                }
+                return newStats;
+            });
+
+            // Iniciar intervalo para atualizar tempo atual e verificar recordes
+            const timeInterval = setInterval(() => {
+                if (!isWaitingForRound && currentPlayerId) {
+                    setPlayerStats(prev => {
+                        const newStats = new Map(prev);
+                        const playerStat = newStats.get(currentPlayerId);
+                        // Só atualizar o tempo se não estiver caindo
+                        if (playerStat && playerStat.startTime && !playerStat.isFalling) {
+                            const currentTime = Date.now() - playerStat.startTime;
+
+                            // Verificar se é um novo recorde enquanto joga
+                            let newBestTime = playerStat.bestTime;
+                            if (currentTime > playerStat.bestTime) {
+                                newBestTime = currentTime;
+                                // Salvar o novo recorde no localStorage
+                                savePlayerRecord(playerStat.name, currentTime);
+                            }
+
+                            newStats.set(currentPlayerId, {
+                                ...playerStat,
+                                currentTime: currentTime,
+                                bestTime: newBestTime
+                            });
+                        }
+                        return newStats;
+                    });
+                }
+            }, 100);
+
+            return () => clearInterval(timeInterval);
+        } else if (isWaitingForRound && currentPlayerId) {
+            // Quando estiver esperando rodada, resetar o tempo atual para 0
+            setPlayerStats(prev => {
+                const newStats = new Map(prev);
+                const playerStat = newStats.get(currentPlayerId);
+                if (playerStat) {
+                    newStats.set(currentPlayerId, {
+                        ...playerStat,
+                        currentTime: 0,
+                        startTime: null,
+                        isFalling: false
+                    });
+                }
+                return newStats;
+            });
+        }
+    }, [isWaitingForRound, currentPlayerId]);
+
+    // Função para parar o tempo quando o jogador começar a cair
+    const stopPlayerTime = () => {
+        if (currentPlayerId) {
+            setPlayerStats(prev => {
+                const newStats = new Map(prev);
+                const playerStat = newStats.get(currentPlayerId);
+                if (playerStat && !playerStat.isFalling) {
+                    newStats.set(currentPlayerId, {
+                        ...playerStat,
+                        isFalling: true
+                    });
                 }
                 return newStats;
             });
@@ -309,10 +482,15 @@ export function useWebSocket(playerName) {
         connected,
         currentPlayerId,
         playerStats,
+        platformSize,
+        isWaitingForRound,
+        waitingCountdown,
+        currentRound,
         sendPositionUpdate,
         sendPlayerFell,
         sendPlayerRespawn,
         updateSelfPlayer,
-        incrementSelfFalls
+        incrementSelfFalls,
+        stopPlayerTime
     };
 }

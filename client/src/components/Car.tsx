@@ -11,8 +11,11 @@ type CarProps = {
     onPlayerRespawn?: (position: [number, number, number], rotation: number, carModel: string) => void;
     onUpdateSelf?: (position: [number, number, number], rotation: number, carModel: string) => void;
     onSelfFell?: () => void;
+    onFallingStateChange?: (isFalling: boolean) => void;
     otherPlayers?: Map<string, any>;
     currentPlayerId?: string;
+    platformSize: number;
+    isWaitingForRound?: boolean;
 };
 
 const Car = forwardRef<THREE.Group, CarProps>(({
@@ -23,8 +26,11 @@ const Car = forwardRef<THREE.Group, CarProps>(({
     onPlayerRespawn,
     onUpdateSelf,
     onSelfFell,
+    onFallingStateChange,
     otherPlayers,
-    currentPlayerId
+    currentPlayerId,
+    platformSize,
+    isWaitingForRound = false
 }, ref) => {
     const groupRef = useRef<THREE.Group>(null);
     const [keys, setKeys] = useState<{ [key: string]: boolean }>({});
@@ -165,28 +171,15 @@ const Car = forwardRef<THREE.Group, CarProps>(({
 
             fallTimeRef.current += safeDelta;
 
+            // Notificar mudança para modo espectador após 3 segundos
+            if (fallTimeRef.current >= 3 && onFallingStateChange) {
+                onFallingStateChange(true);
+            }
+
+            // Esconder o carro depois de 3 segundos de queda
             if (fallTimeRef.current >= 3) {
-                const spawnData = getRandomSpawnPosition();
-
-                current.position.set(...spawnData.position);
-                velocityRef.current.set(0, 0, 0);
-                rotationVelocityRef.current.set(0, 0, 0);
-                angleRef.current = spawnData.angle;
-                current.rotation.set(0, spawnData.angle, 0);
-                fallingRef.current = false;
-                fallTimeRef.current = 0;
-
-                const carNumber = Math.floor(Math.random() * 4) + 1;
-                const newCarPath = `/models/car${carNumber}.glb`;
-                setSelectedCar(newCarPath);
-
-                if (onPlayerRespawn) {
-                    onPlayerRespawn(
-                        spawnData.position,
-                        spawnData.angle,
-                        newCarPath
-                    );
-                }
+                current.position.set(0, -1000, 0);
+                current.visible = false;
             }
             return;
         }
@@ -269,24 +262,27 @@ const Car = forwardRef<THREE.Group, CarProps>(({
         current.position.add(movement);
         current.rotation.y = angle;
 
-        const trackSize = 200;
         const carLength = 3;
-
         const frontX = current.position.x + Math.sin(angle) * carLength;
         const frontZ = current.position.z + Math.cos(angle) * carLength;
 
-        if (Math.abs(frontX) > trackSize/2 || Math.abs(frontZ) > trackSize/2) {
+        // Verificar se saiu da plataforma OU se a plataforma é muito pequena
+        const platformRadius = platformSize / 2;
+        const carDistance = Math.sqrt(current.position.x * current.position.x + current.position.z * current.position.z);
+
+        if (Math.abs(frontX) > platformRadius || Math.abs(frontZ) > platformRadius || carDistance > platformRadius || platformSize <= 5) {
             if (!fallingRef.current) {
                 fallingRef.current = true;
                 velocityRef.current.y = 0;
                 rotationVelocityRef.current.set(0, 0, 0);
 
-                if (onPlayerFell) {
-                    onPlayerFell();
-                }
-
+                // Parar o tempo imediatamente quando começar a cair
                 if (onSelfFell) {
                     onSelfFell();
+                }
+
+                if (onPlayerFell) {
+                    onPlayerFell();
                 }
             }
         }
@@ -311,6 +307,48 @@ const Car = forwardRef<THREE.Group, CarProps>(({
 
         angleRef.current = angle;
     });
+
+    // Remover os useEffects problemáticos e substituir por um simples
+    useEffect(() => {
+        const current = groupRef.current;
+        if (!current) return;
+
+        // Só resetar quando explicitamente não estiver esperando rodada
+        if (!isWaitingForRound) {
+            // Reset para nova rodada
+            const spawnData = getRandomSpawnPosition();
+
+            current.position.set(...spawnData.position);
+            current.visible = true;
+            velocityRef.current.set(0, 0, 0);
+            rotationVelocityRef.current.set(0, 0, 0);
+            angleRef.current = spawnData.angle;
+            current.rotation.set(0, spawnData.angle, 0);
+            fallingRef.current = false;
+            fallTimeRef.current = 0;
+            isJumpingRef.current = false;
+            jumpVelocityRef.current = 0;
+
+            if (onFallingStateChange) {
+                onFallingStateChange(false);
+            }
+
+            const carNumber = Math.floor(Math.random() * 4) + 1;
+            const newCarPath = `/models/car${carNumber}.glb`;
+            setSelectedCar(newCarPath);
+        } else {
+            // Se está esperando rodada, esconder o carro
+            if (current) {
+                current.position.set(0, -1000, 0);
+                current.visible = false;
+                fallingRef.current = false;
+
+                if (onFallingStateChange) {
+                    onFallingStateChange(true);
+                }
+            }
+        }
+    }, [isWaitingForRound]);
 
     return (
         <group ref={groupRef} position={position} castShadow>

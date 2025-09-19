@@ -3,31 +3,54 @@ import React from "react";
 type LeaderboardProps = {
     players: Map<string, any>;
     currentPlayerId?: string;
-    playerStats: Map<string, { name: string; falls: number }>;
+    playerStats: Map<string, {
+        name: string;
+        currentTime: number;
+        bestTime: number;
+        totalRounds: number;
+    }>;
 };
 
 export default function Leaderboard({ players, currentPlayerId, playerStats }: LeaderboardProps) {
+    const formatTime = (milliseconds: number) => {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const ms = Math.floor((milliseconds % 1000) / 10); // Centésimos de segundo
+
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    };
+
     const leaderboardData = Array.from(players.values())
-        .map(player => ({
-            id: player.id,
-            name: player.name,
-            falls: playerStats.get(player.id)?.falls || 0,
-            isCurrentPlayer: player.id === currentPlayerId
-        }))
-        .sort((a, b) => a.falls - b.falls);
+        .map(player => {
+            const stats = playerStats.get(player.id);
+            return {
+                id: player.id,
+                name: player.name,
+                currentTime: stats?.currentTime || 0,
+                bestTime: stats?.bestTime || 0,
+                totalRounds: stats?.totalRounds || 0,
+                isCurrentPlayer: player.id === currentPlayerId,
+                isAlive: !player.falling
+            };
+        })
+        .sort((a, b) => {
+            // Ordenar por melhor tempo (bestTime) em ordem decrescente
+            return b.bestTime - a.bestTime;
+        });
 
     const getPositionColor = (index: number) => {
         switch (index) {
-            case 0: return "#FFD700";
-            case 1: return "#C0C0C0";
-            case 2: return "#CD7F32";
+            case 0: return "#FFD700"; // Ouro
+            case 1: return "#C0C0C0"; // Prata
+            case 2: return "#CD7F32"; // Bronze
             default: return "#666666";
         }
     };
 
     const getPositionIcon = (index: number) => {
         switch (index) {
-            case 0: return "🥇";
+            case 0: return "👑";
             case 1: return "🥈";
             case 2: return "🥉";
             default: return `${index + 1}º`;
@@ -39,113 +62,173 @@ export default function Leaderboard({ players, currentPlayerId, playerStats }: L
             position: "absolute",
             top: 20,
             left: 20,
-            backgroundColor: "rgba(255, 255, 255, 0.98)",
-            padding: "15px",
-            borderRadius: "10px",
-            minWidth: "280px",
-            boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
-            border: "2px solid #ddd",
+            backgroundColor: "rgba(0, 0, 0, 0.92)",
+            padding: "20px",
+            borderRadius: "12px",
+            minWidth: "350px",
+            maxWidth: "400px",
+            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
+            border: "2px solid #444",
             zIndex: 1000,
-            backdropFilter: "blur(5px)"
+            backdropFilter: "blur(10px)",
+            fontFamily: "'Roboto Mono', monospace"
         }}>
             <h3 style={{
-                margin: "0 0 15px 0",
-                color: "#333",
-                fontSize: "18px",
+                margin: "0 0 18px 0",
+                color: "#fff",
+                fontSize: "20px",
                 textAlign: "center",
-                borderBottom: "2px solid #eee",
-                paddingBottom: "8px",
-                fontWeight: "bold"
+                borderBottom: "2px solid #555",
+                paddingBottom: "12px",
+                fontWeight: "bold",
+                letterSpacing: "0.5px"
             }}>
-                🏆 Ranking - Menos Quedas
+                🏆 RECORDES
             </h3>
 
             {leaderboardData.length === 0 ? (
                 <div style={{
-                    color: "#666",
+                    color: "#aaa",
                     textAlign: "center",
                     fontStyle: "italic",
-                    backgroundColor: "rgba(255, 255, 255, 0.9)",
-                    padding: "10px",
-                    borderRadius: "5px"
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    padding: "15px",
+                    borderRadius: "8px"
                 }}>
-                    Aguardando jogadores...
+                    🚗 Aguardando pilotos...
                 </div>
             ) : (
-                leaderboardData.map((player, index) => (
-                    <div
-                        key={player.id}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "8px 12px",
-                            margin: "5px 0",
-                            backgroundColor: player.isCurrentPlayer ? "#e3f2fd" : "rgba(249, 249, 249, 0.95)",
-                            borderRadius: "8px",
-                            border: player.isCurrentPlayer ? "2px solid #2196f3" : "1px solid #eee",
-                            fontWeight: player.isCurrentPlayer ? "bold" : "normal",
-                            backdropFilter: "blur(3px)"
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <span style={{
-                                fontSize: "16px",
-                                minWidth: "30px",
-                                textAlign: "center",
-                                color: getPositionColor(index)
+                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                    {leaderboardData.map((player, index) => (
+                        <div
+                            key={player.id}
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                padding: "12px 15px",
+                                margin: "8px 0",
+                                backgroundColor: player.isCurrentPlayer
+                                    ? "rgba(33, 150, 243, 0.25)"
+                                    : "rgba(255, 255, 255, 0.08)",
+                                borderRadius: "10px",
+                                border: player.isCurrentPlayer
+                                    ? "2px solid #2196f3"
+                                    : "1px solid rgba(255, 255, 255, 0.1)",
+                                transition: "all 0.3s ease",
+                                position: "relative"
+                            }}
+                        >
+                            {/* Header com posição e nome */}
+                            <div style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                marginBottom: "8px"
                             }}>
-                                {getPositionIcon(index)}
-                            </span>
-                            <span style={{
-                                color: "#333",
-                                fontSize: "14px",
-                                maxWidth: "120px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap"
-                            }}>
-                                {player.name}
-                                {player.isCurrentPlayer && " (Você)"}
-                            </span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                    <span style={{
+                                        fontSize: "18px",
+                                        minWidth: "35px",
+                                        textAlign: "center",
+                                        color: getPositionColor(index),
+                                        fontWeight: "bold"
+                                    }}>
+                                        {getPositionIcon(index)}
+                                    </span>
+                                    <div>
+                                        <div style={{
+                                            color: "#fff",
+                                            fontSize: "16px",
+                                            fontWeight: "bold",
+                                            maxWidth: "140px",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap"
+                                        }}>
+                                            {player.name}
+                                            {player.isCurrentPlayer && " 👤"}
+                                        </div>
+                                        <div style={{
+                                            fontSize: "11px",
+                                            color: "#bbb",
+                                            marginTop: "2px"
+                                        }}>
+                                            {player.isAlive && "🟢 ATIVO"}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Melhor tempo destacado */}
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{
+                                        fontSize: "16px",
+                                        fontWeight: "bold",
+                                        color: player.bestTime > 0 ? "#4caf50" : "#999",
+                                        fontFamily: "'Roboto Mono', monospace"
+                                    }}>
+                                        {player.bestTime > 0 ? formatTime(player.bestTime) : "--:--:--"}
+                                    </div>
+                                    <div style={{
+                                        fontSize: "10px",
+                                        color: "#999",
+                                        marginTop: "2px"
+                                    }}>
+                                        RECORDE
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tempo atual - só mostra se o jogador estiver vivo e não esperando rodada */}
+                            {player.isAlive && !player.isCurrentPlayer ? null : (
+                                player.isAlive && (
+                                    <div style={{
+                                        backgroundColor: "rgba(255, 255, 255, 0.05)",
+                                        padding: "8px 12px",
+                                        borderRadius: "6px",
+                                        textAlign: "center"
+                                    }}>
+                                        <div style={{
+                                            fontSize: "18px",
+                                            fontWeight: "bold",
+                                            color: "#00ff88",
+                                            fontFamily: "'Roboto Mono', monospace"
+                                        }}>
+                                            {formatTime(player.currentTime)}
+                                        </div>
+                                        <div style={{ fontSize: "10px", color: "#aaa" }}>
+                                            TEMPO ATUAL
+                                        </div>
+                                    </div>
+                                )
+                            )}
                         </div>
-                        
-                        <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "5px"
-                        }}>
-                            <span style={{ fontSize: "12px", color: "#666" }}>Quedas:</span>
-                            <span style={{
-                                backgroundColor: player.falls === 0 ? "#4caf50" : "#ff9800",
-                                color: "white",
-                                padding: "2px 8px",
-                                borderRadius: "12px",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                minWidth: "20px",
-                                textAlign: "center"
-                            }}>
-                                {player.falls}
-                            </span>
-                        </div>
-                    </div>
-                ))
+                    ))}
+                </div>
             )}
 
             <div style={{
-                marginTop: "10px",
-                paddingTop: "8px",
-                borderTop: "1px solid #eee",
-                fontSize: "12px",
-                color: "#666",
-                textAlign: "center",
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
-                borderRadius: "5px",
-                padding: "5px"
+                marginTop: "15px",
+                paddingTop: "12px",
+                borderTop: "1px solid #555",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center"
             }}>
-                Jogadores online: {players.size}
+                <div style={{
+                    fontSize: "12px",
+                    color: "#aaa"
+                }}>
+                    👥 {players.size} Piloto{players.size !== 1 ? 's' : ''} Online
+                </div>
             </div>
+
+            <style>{`
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                    100% { transform: scale(1); }
+                }
+            `}</style>
         </div>
     );
 }
