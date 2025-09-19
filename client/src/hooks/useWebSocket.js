@@ -7,7 +7,6 @@ export function useWebSocket(playerName) {
     const [currentPlayerId, setCurrentPlayerId] = useState(null);
     const [playerStats, setPlayerStats] = useState(new Map());
     const heartbeatInterval = useRef(null);
-    const isWindowFocused = useRef(true);
 
     const saveFallsToStorage = (playerId, playerName, falls) => {
         const playerData = {
@@ -34,45 +33,15 @@ export function useWebSocket(playerName) {
     };
 
     useEffect(() => {
-        const handleFocus = () => {
-            isWindowFocused.current = true;
-        };
-
-        const handleBlur = () => {
-            isWindowFocused.current = false;
-            setTimeout(() => {
-                if (!isWindowFocused.current && ws.current && ws.current.readyState === WebSocket.OPEN) {
-                    ws.current.send(JSON.stringify({ type: 'INACTIVE' }));
-                }
-            }, 2000);
-        };
-
-        window.addEventListener('focus', handleFocus);
-        window.addEventListener('blur', handleBlur);
-        window.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                handleBlur();
-            } else {
-                handleFocus();
-            }
-        });
-
-        return () => {
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('blur', handleBlur);
-        };
-    }, []);
-
-    useEffect(() => {
         if (!playerName) return;
 
-        ws.current = new WebSocket('wss://ioficina.iopoint.com.br/ws/');
+        // ws.current = new WebSocket('wss://ioficina.iopoint.com.br/ws/');
+        ws.current = new WebSocket('ws://localhost:8888/');
 
         heartbeatInterval.current = setInterval(() => {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
                 ws.current.send(JSON.stringify({
-                    type: 'HEARTBEAT',
-                    focused: isWindowFocused.current
+                    type: 'HEARTBEAT'
                 }));
             }
         }, 5000);
@@ -241,7 +210,6 @@ export function useWebSocket(playerName) {
                     break;
 
                 case 'KICKED':
-                    alert('Você foi desconectado por inatividade!');
                     window.location.reload();
                     break;
 

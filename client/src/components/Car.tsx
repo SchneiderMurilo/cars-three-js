@@ -38,6 +38,9 @@ const Car = forwardRef<THREE.Group, CarProps>(({
         const carNumber = Math.floor(Math.random() * 4) + 1;
         return `/models/car${carNumber}.glb`;
     });
+    const jumpVelocityRef = useRef(0);
+    const isJumpingRef = useRef(false);
+    const jumpCooldownRef = useRef(false);
 
     const { scene } = useGLTF(selectedCar);
 
@@ -188,6 +191,25 @@ const Car = forwardRef<THREE.Group, CarProps>(({
             return;
         }
 
+        // Lógica do pulo
+        if (keys[" "] && !isJumpingRef.current && !jumpCooldownRef.current) {
+            jumpVelocityRef.current = 0.5; // Força inicial do pulo
+            isJumpingRef.current = true;
+            jumpCooldownRef.current = true;
+            setTimeout(() => jumpCooldownRef.current = false, 500); // Cooldown de 1.5 segundos
+        }
+
+        if (isJumpingRef.current) {
+            jumpVelocityRef.current -= 1.5 * safeDelta; // Gravidade
+            current.position.y += jumpVelocityRef.current;
+
+            if (current.position.y <= 0.5) { // Altura base do carro
+                current.position.y = 0.5;
+                isJumpingRef.current = false;
+                jumpVelocityRef.current = 0;
+            }
+        }
+
         const velocity = velocityRef.current;
         let angle = angleRef.current;
 
@@ -224,12 +246,14 @@ const Car = forwardRef<THREE.Group, CarProps>(({
 
         resolveOverlap(current);
 
+        // Modificar a verificação de colisão para considerar a altura
         if (otherPlayers && currentPlayerId) {
             Array.from(otherPlayers.values()).forEach(otherPlayer => {
                 if (otherPlayer.id !== currentPlayerId && !otherPlayer.falling) {
                     const otherPos = new THREE.Vector3(...otherPlayer.position);
+                    const heightDiff = Math.abs(current.position.y - otherPos.y);
 
-                    if (checkCollision(current.position, otherPos)) {
+                    if (checkCollision(current.position, otherPos) && heightDiff < 2) {
                         handleCollision(current.position, otherPos, velocity);
                     }
                 }

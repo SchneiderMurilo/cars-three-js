@@ -112,7 +112,13 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
         } else {
             const lerpFactor = isBeingPushed ? 0.8 : 0.15;
 
-            smoothedPosition.current.lerp(targetPosition.current, lerpFactor);
+            // Agora usamos a altura real do jogador
+            smoothedPosition.current.lerp(new THREE.Vector3(
+                player.position[0],
+                player.position[1], // Altura do pulo é sincronizada
+                player.position[2]
+            ), lerpFactor);
+
             groupRef.current.position.copy(smoothedPosition.current);
 
             const currentY = groupRef.current.rotation.y;
@@ -122,10 +128,11 @@ export default function OtherPlayer({ player }: OtherPlayerProps) {
             groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
         }
 
+        // Atualiza a posição do nome para seguir a altura do pulo
         if (nameRef.current) {
             nameRef.current.position.set(
                 groupRef.current.position.x,
-                groupRef.current.position.y + 5,
+                groupRef.current.position.y + 5, // Nome segue a altura do carro
                 groupRef.current.position.z
             );
             nameRef.current.lookAt(camera.position);

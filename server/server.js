@@ -10,7 +10,7 @@ const rooms = new Map();
 setInterval(() => {
     const now = Date.now();
     players.forEach((player, playerId) => {
-        if (now - player.lastHeartbeat > 15000 || (player.inactive && now - player.inactiveTime > 10000)) {
+        if (now - player.lastHeartbeat > 15000) {
 
             if (player.ws.readyState === WebSocket.OPEN) {
                 player.ws.send(JSON.stringify({ type: 'KICKED' }));
@@ -24,6 +24,7 @@ setInterval(() => {
 
 wss.on('connection', (ws) => {
     const playerId = uuidv4();
+    console.log(`[${new Date().toISOString()}] Novo jogador conectado. ID: ${playerId}`);
 
     ws.on('message', (message) => {
         try {
@@ -45,18 +46,17 @@ wss.on('connection', (ws) => {
                 case 'HEARTBEAT':
                     handleHeartbeat(playerId, data);
                     break;
-                case 'INACTIVE':
-                    handlePlayerInactive(playerId);
-                    break;
                 case 'PING':
                     ws.send(JSON.stringify({ type: 'PONG' }));
                     break;
             }
         } catch (error) {
+            console.error(`[${new Date().toISOString()}] Erro ao processar mensagem:`, error);
         }
     });
 
     ws.on('close', () => {
+        console.log(`[${new Date().toISOString()}] Jogador desconectado. ID: ${playerId}`);
         handlePlayerDisconnect(playerId);
     });
 
@@ -136,6 +136,7 @@ function handlePositionUpdate(playerId, data) {
     const player = players.get(playerId);
     if (!player) return;
 
+    // Agora incluímos a altura (y) na posição
     player.position = data.position;
     player.rotation = data.rotation;
     player.carModel = String(data.carModel);
@@ -143,7 +144,7 @@ function handlePositionUpdate(playerId, data) {
     broadcastToRoom(player.roomId, {
         type: 'PLAYER_UPDATE',
         playerId: playerId,
-        position: data.position,
+        position: data.position, // Isso já inclui a altura do pulo
         rotation: data.rotation,
         carModel: String(data.carModel)
     }, playerId);
@@ -206,25 +207,7 @@ function handleHeartbeat(playerId, data) {
 
     player.lastHeartbeat = Date.now();
 
-    if (!data.focused && !player.inactive) {
-        player.inactive = true;
-        player.inactiveTime = Date.now();
-    }
-
-    if (data.focused && player.inactive) {
-        player.inactive = false;
-        player.inactiveTime = null;
-    }
-
     player.ws.send(JSON.stringify({ type: 'PONG' }));
-}
-
-function handlePlayerInactive(playerId) {
-    const player = players.get(playerId);
-    if (!player) return;
-
-    player.inactive = true;
-    player.inactiveTime = Date.now();
 }
 
 function broadcastToRoom(roomId, message, excludePlayerId = null) {
